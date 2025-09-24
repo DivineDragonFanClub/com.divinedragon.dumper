@@ -1,0 +1,20 @@
+{
+    "name": "DivineDumper",
+    "rootNamespace": "DivineDragon",
+    "references": [
+        "GUID:332f144202c5345808e8db28bf958969",
+        "GUID:672b6abd5f96b41bd9bbed9f7875343c",
+        "GUID:d99465626892a421fba67bec080e724c"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
