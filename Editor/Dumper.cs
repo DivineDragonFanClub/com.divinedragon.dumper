@@ -4,7 +4,10 @@ using System.Net;
 using System.Runtime.CompilerServices;
 using Dragonstone;
 using UnityEditor;
+using UnityEditor.AddressableAssets.Build;
+using UnityEditor.AddressableAssets.Settings;
 using UnityEngine;
+using UnityEngine.AddressableAssets;
 
 namespace DivineDragon
 {
@@ -31,6 +34,19 @@ namespace DivineDragon
 
             if (!Initialized)
             {
+                // Ensure the project has been built at least once
+                if (!File.Exists(Addressables.BuildPath))
+                {
+                    AddressableAssetSettings.BuildPlayerContent(out AddressablesPlayerBuildResult result);
+                    bool success = string.IsNullOrEmpty(result.Error);
+
+                    if (!success)
+                    {
+                        Debug.LogError("Addressables build error encountered: " + result.Error);
+                        return false;
+                    }
+                }
+                
                 if (CBT.LoadCatalogContent("Assets/Share/AddressableAssetsData/TempCatalogFolder/catalog.json")) {
                     Initialized = true;
                 }
