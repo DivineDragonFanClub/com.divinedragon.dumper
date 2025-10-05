@@ -89,7 +89,7 @@ namespace DivineDragon
             
             EditorUtility.DisplayProgressBar("Dumper", "Listing files...", 0.1f);
             
-            string[] bundles = Directory.GetFiles(path, "*.bundle", SearchOption.AllDirectories);
+            string[] bundles = Directory.GetFiles(path.Replace("\\", "/"), "*.bundle", SearchOption.AllDirectories);
             
             EditorUtility.DisplayProgressBar("Dumper", "Starting AssetRipper...", 0.1f);
             

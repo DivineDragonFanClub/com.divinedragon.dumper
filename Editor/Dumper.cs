@@ -109,7 +109,7 @@ namespace DivineDragon
             
             foreach (string bundle in paths)
             {
-                dependencies = dependencies.Concat(CBT.GetDependenciesForAsset(CBT.PathToInternalId(bundle)));
+                dependencies = dependencies.Concat(CBT.GetDependenciesForAsset(CBT.PathToInternalId(bundle.Replace("\\", "/"))));
             }
             
             AssetRipperRequestBuilder builder = new AssetRipperRequestBuilder();
