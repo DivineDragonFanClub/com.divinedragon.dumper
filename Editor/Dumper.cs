@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -56,13 +57,13 @@ namespace DivineDragon
         }
 
         /// <summary>
-        /// Calls on DivineRipper to extract an asset from the game
+        /// Calls on DivineRipper to extract a bundle from the game
         /// </summary>
         /// <remarks>
         /// This method will automatically find dependencies for this specific key and get them extracted alongside the specified bundle.
-        /// 
         /// </remarks>
-        /// <param name="key">Also known as address</param>
+        /// <param name="key">The key for the asset, also known as address</param>
+        /// <returns>Returns true if the operation is successful</returns>
         public static bool ExtractAsset(string key)
         {
             if (string.IsNullOrEmpty(key))
@@ -79,6 +80,41 @@ namespace DivineDragon
             AssetRipperRequestBuilder builder = new AssetRipperRequestBuilder();
             
             foreach (string dependency in dependencies)
+            {
+                builder.AddFile(dependency);
+            }
+
+            if (!builder.Export("dumper"))
+                Debug.LogError($"Export was unsuccessful");
+            
+            return true;
+        }
+        
+        /// <summary>
+        /// Calls on DivineRipper to extract multiple bundles from the game
+        /// </summary>
+        /// <param name="paths">Paths to the bundles relative to the game's BuildPath directory</param>
+        /// <returns>Returns true if the operation is successful</returns>
+        public static bool ExtractAssets(string[] paths)
+        {
+            if (paths.Length <= 0)
+            {
+                Debug.LogWarning("ExtractAssets: no bundle found in directory and subdirectories");
+                return false;
+            }
+            
+            Initialize();
+
+            IEnumerable<string> dependencies = new List<string>();
+            
+            foreach (string bundle in paths)
+            {
+                dependencies = dependencies.Concat(CBT.GetDependenciesForAsset(CBT.PathToInternalId(bundle)));
+            }
+            
+            AssetRipperRequestBuilder builder = new AssetRipperRequestBuilder();
+            
+            foreach (string dependency in dependencies.Distinct())
             {
                 builder.AddFile(dependency);
             }
