@@ -5,7 +5,10 @@ using System.Net;
 using System.Runtime.CompilerServices;
 using Dragonstone;
 using UnityEditor;
+using UnityEditor.AddressableAssets.Build;
+using UnityEditor.AddressableAssets.Settings;
 using UnityEngine;
+using UnityEngine.AddressableAssets;
 
 namespace DivineDragon
 {
@@ -32,6 +35,19 @@ namespace DivineDragon
 
             if (!Initialized)
             {
+                // Ensure the project has been built at least once
+                if (!File.Exists(Addressables.BuildPath))
+                {
+                    AddressableAssetSettings.BuildPlayerContent(out AddressablesPlayerBuildResult result);
+                    bool success = string.IsNullOrEmpty(result.Error);
+
+                    if (!success)
+                    {
+                        Debug.LogError("Addressables build error encountered: " + result.Error);
+                        return false;
+                    }
+                }
+                
                 if (CBT.LoadCatalogContent("Assets/Share/AddressableAssetsData/TempCatalogFolder/catalog.json")) {
                     Initialized = true;
                 }
@@ -41,13 +57,13 @@ namespace DivineDragon
         }
 
         /// <summary>
-        /// Calls on DivineRipper to extract an asset from the game
+        /// Calls on DivineRipper to extract a bundle from the game
         /// </summary>
         /// <remarks>
         /// This method will automatically find dependencies for this specific key and get them extracted alongside the specified bundle.
-        /// 
         /// </remarks>
-        /// <param name="key">Also known as address</param>
+        /// <param name="key">The key for the asset, also known as address</param>
+        /// <returns>Returns true if the operation is successful</returns>
         public static bool ExtractAsset(string key)
         {
             if (string.IsNullOrEmpty(key))
@@ -64,6 +80,41 @@ namespace DivineDragon
             AssetRipperRequestBuilder builder = new AssetRipperRequestBuilder();
             
             foreach (string dependency in dependencies)
+            {
+                builder.AddFile(dependency);
+            }
+
+            if (!builder.Export("dumper"))
+                Debug.LogError($"Export was unsuccessful");
+            
+            return true;
+        }
+        
+        /// <summary>
+        /// Calls on DivineRipper to extract multiple bundles from the game
+        /// </summary>
+        /// <param name="paths">Paths to the bundles relative to the game's BuildPath directory</param>
+        /// <returns>Returns true if the operation is successful</returns>
+        public static bool ExtractAssets(string[] paths)
+        {
+            if (paths.Length <= 0)
+            {
+                Debug.LogWarning("ExtractAssets: no bundle found in directory and subdirectories");
+                return false;
+            }
+            
+            Initialize();
+
+            IEnumerable<string> dependencies = new List<string>();
+            
+            foreach (string bundle in paths)
+            {
+                dependencies = dependencies.Concat(CBT.GetDependenciesForAsset(CBT.PathToInternalId(bundle.Replace("\\", "/"))));
+            }
+            
+            AssetRipperRequestBuilder builder = new AssetRipperRequestBuilder();
+            
+            foreach (string dependency in dependencies.Distinct())
             {
                 builder.AddFile(dependency);
             }
