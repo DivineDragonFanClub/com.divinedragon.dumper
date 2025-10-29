@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
@@ -107,7 +108,8 @@ namespace DivineDragon.EditorUtilities
 
             foreach (var meshFilter in meshFilters)
             {
-                if (meshFilter.sharedMesh == null)
+                Mesh originalMesh = meshFilter.sharedMesh;
+                if (originalMesh == null)
                     continue;
 
                 string gameObjectName = meshFilter.gameObject.name;
@@ -120,27 +122,7 @@ namespace DivineDragon.EditorUtilities
                     continue;
                 }
 
-                // Load the FBX
-                GameObject fbxObject = AssetDatabase.LoadAssetAtPath<GameObject>(fbxAssetPath);
-                if (fbxObject == null)
-                {
-                    LogWarning($"Failed to load FBX for {gameObjectName}");
-                    continue;
-                }
-
-                // Get the mesh from the FBX
-                // The FBX should contain the mesh as a sub-asset
-                UnityEngine.Object[] subAssets = AssetDatabase.LoadAllAssetsAtPath(fbxAssetPath);
-                Mesh fbxMesh = null;
-
-                foreach (UnityEngine.Object asset in subAssets)
-                {
-                    if (asset is Mesh mesh)
-                    {
-                        fbxMesh = mesh;
-                        break;
-                    }
-                }
+                Mesh fbxMesh = LoadMeshFromFbx(fbxAssetPath, originalMesh, gameObjectName);
 
                 if (fbxMesh != null)
                 {
@@ -149,7 +131,7 @@ namespace DivineDragon.EditorUtilities
                 }
                 else
                 {
-                    LogWarning($"No mesh found in FBX for {gameObjectName}");
+                    LogWarning($"No matching mesh found in FBX for {gameObjectName} (expected '{originalMesh.name}')");
                 }
             }
 
@@ -237,7 +219,8 @@ namespace DivineDragon.EditorUtilities
 
             foreach (var meshFilter in meshFilters)
             {
-                if (meshFilter.sharedMesh == null)
+                Mesh originalMesh = meshFilter.sharedMesh;
+                if (originalMesh == null)
                     continue;
 
                 string gameObjectName = meshFilter.gameObject.name;
@@ -250,26 +233,7 @@ namespace DivineDragon.EditorUtilities
                     continue;
                 }
 
-                // Load the FBX
-                GameObject fbxObject = AssetDatabase.LoadAssetAtPath<GameObject>(fbxAssetPath);
-                if (fbxObject == null)
-                {
-                    LogWarning($"Failed to load FBX for {gameObjectName}");
-                    continue;
-                }
-
-                // Get the mesh from the FBX
-                UnityEngine.Object[] subAssets = AssetDatabase.LoadAllAssetsAtPath(fbxAssetPath);
-                Mesh fbxMesh = null;
-
-                foreach (UnityEngine.Object asset in subAssets)
-                {
-                    if (asset is Mesh mesh)
-                    {
-                        fbxMesh = mesh;
-                        break;
-                    }
-                }
+                Mesh fbxMesh = LoadMeshFromFbx(fbxAssetPath, originalMesh, gameObjectName);
 
                 if (fbxMesh != null)
                 {
@@ -287,7 +251,7 @@ namespace DivineDragon.EditorUtilities
                 }
                 else
                 {
-                    LogWarning($"No mesh found in FBX for {gameObjectName}");
+                    LogWarning($"No matching mesh found in FBX for {gameObjectName} (expected '{originalMesh.name}')");
                 }
             }
 
@@ -362,6 +326,139 @@ namespace DivineDragon.EditorUtilities
 
             importer.importTangents = ModelImporterTangents.Import;
             return true;
+        }
+
+        private static Mesh LoadMeshFromFbx(string assetPath, Mesh originalMesh, string gameObjectName)
+        {
+            if (string.IsNullOrEmpty(assetPath))
+                return null;
+
+            Mesh bestMatch = null;
+            int bestScore = int.MinValue;
+
+            string originalName = NormalizeMeshName(originalMesh?.name);
+            string objectName = NormalizeMeshName(gameObjectName);
+            int originalVertexCount = originalMesh != null ? originalMesh.vertexCount : 0;
+            int originalSubMeshCount = originalMesh != null ? originalMesh.subMeshCount : 0;
+            Bounds originalBounds = originalMesh != null ? originalMesh.bounds : default;
+
+            foreach (UnityEngine.Object asset in AssetDatabase.LoadAllAssetsAtPath(assetPath))
+            {
+                if (asset is Mesh mesh)
+                {
+                    string meshName = NormalizeMeshName(mesh.name);
+                    int score = 0;
+
+                    if (!string.IsNullOrEmpty(originalName) && NamesMatch(meshName, originalName))
+                        score += 100;
+
+                    if (!string.IsNullOrEmpty(objectName) && NamesMatch(meshName, objectName))
+                        score += 90;
+
+                    if (!string.IsNullOrEmpty(originalName) && ContainsIgnoreCase(meshName, originalName))
+                        score += 50;
+
+                    if (!string.IsNullOrEmpty(objectName) && ContainsIgnoreCase(meshName, objectName))
+                        score += 40;
+
+                    if (originalVertexCount > 0 && mesh.vertexCount == originalVertexCount)
+                        score += 20;
+
+                    if (originalSubMeshCount > 0 && mesh.subMeshCount == originalSubMeshCount)
+                        score += 10;
+
+                    if (originalVertexCount > 0 && mesh.vertexCount != originalVertexCount)
+                        score -= Math.Abs(mesh.vertexCount - originalVertexCount) / 10;
+
+                    if (originalSubMeshCount > 0 && mesh.subMeshCount != originalSubMeshCount)
+                        score -= Math.Abs(mesh.subMeshCount - originalSubMeshCount) * 2;
+
+                    if (originalVertexCount > 0)
+                    {
+                        float originalMagnitude = originalBounds.size.magnitude;
+                        float candidateMagnitude = mesh.bounds.size.magnitude;
+                        if (originalMagnitude > Mathf.Epsilon && candidateMagnitude > Mathf.Epsilon)
+                        {
+                            float difference = Mathf.Abs(originalMagnitude - candidateMagnitude);
+                            score -= Mathf.RoundToInt(difference * 10f);
+                        }
+                    }
+
+                    if (score > bestScore)
+                    {
+                        bestScore = score;
+                        bestMatch = mesh;
+                    }
+
+                    if (bestMatch == null)
+                        bestMatch = mesh;
+                }
+            }
+
+            return bestMatch;
+        }
+
+        private static string NormalizeMeshName(string name)
+        {
+            if (string.IsNullOrEmpty(name))
+                return string.Empty;
+
+            string normalized = name;
+
+            int suffixIndex = normalized.IndexOf("__FBXify", StringComparison.OrdinalIgnoreCase);
+            if (suffixIndex >= 0)
+            {
+                normalized = normalized.Substring(0, suffixIndex);
+            }
+
+            return normalized;
+        }
+
+        private static bool NamesMatch(string lhs, string rhs)
+        {
+            if (string.IsNullOrEmpty(lhs) || string.IsNullOrEmpty(rhs))
+                return false;
+
+            if (string.Equals(lhs, rhs, StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            lhs = TrimUnityDuplicateSuffix(lhs);
+            rhs = TrimUnityDuplicateSuffix(rhs);
+
+            return string.Equals(lhs, rhs, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool ContainsIgnoreCase(string haystack, string needle)
+        {
+            if (string.IsNullOrEmpty(haystack) || string.IsNullOrEmpty(needle))
+                return false;
+
+            return haystack.IndexOf(needle, StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static string TrimUnityDuplicateSuffix(string name)
+        {
+            if (string.IsNullOrEmpty(name))
+                return string.Empty;
+
+            int dotIndex = name.LastIndexOf('.');
+            if (dotIndex > 0 && dotIndex < name.Length - 1)
+            {
+                bool numeric = true;
+                for (int i = dotIndex + 1; i < name.Length; i++)
+                {
+                    if (!char.IsDigit(name[i]))
+                    {
+                        numeric = false;
+                        break;
+                    }
+                }
+
+                if (numeric)
+                    return name.Substring(0, dotIndex);
+            }
+
+            return name;
         }
     }
 }
