@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
 using UnityEditor.Formats.Fbx.Exporter;
@@ -42,6 +43,8 @@ namespace DivineDragon.EditorUtilities
 
                 // Export each GameObject with a MeshFilter as a separate FBX
                 int exportedCount = 0;
+                var exportedAssetPaths = new List<string>();
+
                 foreach (var meshFilter in meshFilters)
                 {
                     if (meshFilter.sharedMesh == null)
@@ -61,6 +64,8 @@ namespace DivineDragon.EditorUtilities
                         continue;
                     }
 
+                    exportedAssetPaths.Add(GetIndividualFBXAssetPath(prefabName, gameObjectName));
+
                     Log($"Exported {gameObjectName} to: {exportedPath}");
                     exportedCount++;
                 }
@@ -73,6 +78,8 @@ namespace DivineDragon.EditorUtilities
 
                 // Force Unity to import all the FBX files
                 AssetDatabase.Refresh();
+
+                ApplyModelImportSettings(exportedAssetPaths);
                 AssetDatabase.SaveAssets();
 
                 // Update mesh references to point to the FBX files
@@ -123,10 +130,10 @@ namespace DivineDragon.EditorUtilities
 
                 // Get the mesh from the FBX
                 // The FBX should contain the mesh as a sub-asset
-                Object[] subAssets = AssetDatabase.LoadAllAssetsAtPath(fbxAssetPath);
+                UnityEngine.Object[] subAssets = AssetDatabase.LoadAllAssetsAtPath(fbxAssetPath);
                 Mesh fbxMesh = null;
 
-                foreach (var asset in subAssets)
+                foreach (UnityEngine.Object asset in subAssets)
                 {
                     if (asset is Mesh mesh)
                     {
@@ -174,6 +181,8 @@ namespace DivineDragon.EditorUtilities
 
             // Export each GameObject with a MeshFilter as a separate FBX
             int exportedCount = 0;
+            var exportedAssetPaths = new List<string>();
+
             foreach (var meshFilter in meshFilters)
             {
                 if (meshFilter.sharedMesh == null)
@@ -193,6 +202,8 @@ namespace DivineDragon.EditorUtilities
                     continue;
                 }
 
+                exportedAssetPaths.Add(GetIndividualFBXAssetPath(folderName, gameObjectName));
+
                 Log($"Exported {gameObjectName} to: {exportedPath}");
                 exportedCount++;
             }
@@ -205,6 +216,8 @@ namespace DivineDragon.EditorUtilities
 
             // Force Unity to import all the FBX files
             AssetDatabase.Refresh();
+
+            ApplyModelImportSettings(exportedAssetPaths);
             AssetDatabase.SaveAssets();
 
             // Update mesh references to point to the FBX files
@@ -246,10 +259,10 @@ namespace DivineDragon.EditorUtilities
                 }
 
                 // Get the mesh from the FBX
-                Object[] subAssets = AssetDatabase.LoadAllAssetsAtPath(fbxAssetPath);
+                UnityEngine.Object[] subAssets = AssetDatabase.LoadAllAssetsAtPath(fbxAssetPath);
                 Mesh fbxMesh = null;
 
-                foreach (var asset in subAssets)
+                foreach (UnityEngine.Object asset in subAssets)
                 {
                     if (asset is Mesh mesh)
                     {
@@ -279,6 +292,76 @@ namespace DivineDragon.EditorUtilities
             }
 
             return updatedCount > 0;
+        }
+
+        private static void ApplyModelImportSettings(IEnumerable<string> assetPaths)
+        {
+            if (assetPaths == null)
+            {
+                return;
+            }
+
+            var uniquePaths = new HashSet<string>(assetPaths);
+
+            foreach (string assetPath in uniquePaths)
+            {
+                AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport);
+
+                var importer = AssetImporter.GetAtPath(assetPath) as ModelImporter;
+                if (importer == null)
+                {
+                    LogWarning($"Importer not found or not a model importer for {assetPath}");
+                    continue;
+                }
+
+                bool changed = false;
+
+                changed |= EnsureUseFileUnits(importer);
+                changed |= EnsureUseFileScale(importer);
+                changed |= EnsureOptimizeMeshVertexOrder(importer);
+                changed |= EnsureImportTangents(importer);
+
+                if (changed)
+                {
+                    importer.SaveAndReimport();
+                }
+            }
+        }
+
+        private static bool EnsureUseFileUnits(ModelImporter importer)
+        {
+            if (importer.useFileUnits)
+                return false;
+
+            importer.useFileUnits = true;
+            return true;
+        }
+
+        private static bool EnsureUseFileScale(ModelImporter importer)
+        {
+            if (importer.useFileScale)
+                return false;
+
+            importer.useFileScale = true;
+            return true;
+        }
+
+        private static bool EnsureOptimizeMeshVertexOrder(ModelImporter importer)
+        {
+            if (importer.optimizeMeshVertices)
+                return false;
+
+            importer.optimizeMeshVertices = true;
+            return true;
+        }
+
+        private static bool EnsureImportTangents(ModelImporter importer)
+        {
+            if (importer.importTangents == ModelImporterTangents.Import)
+                return false;
+
+            importer.importTangents = ModelImporterTangents.Import;
+            return true;
         }
     }
 }
