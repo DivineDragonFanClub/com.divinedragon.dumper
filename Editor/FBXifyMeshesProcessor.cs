@@ -55,17 +55,25 @@ namespace DivineDragon.EditorUtilities
                     }
 
                     string gameObjectName = meshFilter.gameObject.name;
-                    string fbxPath = GetIndividualFBXOutputPath(prefabName, gameObjectName);
+                    string assetPath = GetIndividualFBXAssetPath(prefabName, gameObjectName);
+                    string absolutePath = GetIndividualFBXOutputPath(prefabName, gameObjectName);
+
+                    if (TryReuseExistingFbx(meshFilter.sharedMesh, assetPath, absolutePath, gameObjectName))
+                    {
+                        exportedAssetPaths.Add(assetPath);
+                        exportedCount++;
+                        continue;
+                    }
 
                     // Export this specific GameObject
-                    string exportedPath = ModelExporter.ExportObject(fbxPath, meshFilter.gameObject);
+                    string exportedPath = ModelExporter.ExportObject(absolutePath, meshFilter.gameObject);
                     if (string.IsNullOrEmpty(exportedPath))
                     {
                         LogError($"Failed to export GameObject: {gameObjectName}");
                         continue;
                     }
 
-                    exportedAssetPaths.Add(GetIndividualFBXAssetPath(prefabName, gameObjectName));
+                    exportedAssetPaths.Add(assetPath);
 
                     Log($"Exported {gameObjectName} to: {exportedPath}");
                     exportedCount++;
@@ -174,17 +182,25 @@ namespace DivineDragon.EditorUtilities
                 }
 
                 string gameObjectName = meshFilter.gameObject.name;
-                string fbxPath = GetIndividualFBXOutputPath(folderName, gameObjectName);
+                string assetPath = GetIndividualFBXAssetPath(folderName, gameObjectName);
+                string absolutePath = GetIndividualFBXOutputPath(folderName, gameObjectName);
+
+                if (TryReuseExistingFbx(meshFilter.sharedMesh, assetPath, absolutePath, gameObjectName))
+                {
+                    exportedAssetPaths.Add(assetPath);
+                    exportedCount++;
+                    continue;
+                }
 
                 // Export this specific GameObject
-                string exportedPath = ModelExporter.ExportObject(fbxPath, meshFilter.gameObject);
+                string exportedPath = ModelExporter.ExportObject(absolutePath, meshFilter.gameObject);
                 if (string.IsNullOrEmpty(exportedPath))
                 {
                     LogError($"Failed to export GameObject: {gameObjectName}");
                     continue;
                 }
 
-                exportedAssetPaths.Add(GetIndividualFBXAssetPath(folderName, gameObjectName));
+                exportedAssetPaths.Add(assetPath);
 
                 Log($"Exported {gameObjectName} to: {exportedPath}");
                 exportedCount++;
@@ -325,6 +341,27 @@ namespace DivineDragon.EditorUtilities
                 return false;
 
             importer.importTangents = ModelImporterTangents.Import;
+            return true;
+        }
+
+        private static bool TryReuseExistingFbx(Mesh originalMesh, string assetPath, string absolutePath, string objectName)
+        {
+            if (originalMesh == null)
+                return false;
+
+            bool assetExists = !string.IsNullOrEmpty(absolutePath) && File.Exists(absolutePath);
+            if (!assetExists)
+            {
+                // Asset might still be known to Unity even if the file is missing
+                if (string.IsNullOrEmpty(assetPath) || AssetDatabase.LoadAllAssetsAtPath(assetPath).Length == 0)
+                    return false;
+            }
+
+            Mesh candidate = LoadMeshFromFbx(assetPath, originalMesh, objectName);
+            if (candidate == null)
+                return false;
+
+            Log($"Reusing existing FBX for {objectName}: {assetPath}");
             return true;
         }
 
