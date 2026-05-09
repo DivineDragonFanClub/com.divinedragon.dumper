@@ -1,14 +1,8 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Net;
-using System.Runtime.CompilerServices;
 using Dragonstone;
-using UnityEditor;
-using UnityEditor.AddressableAssets.Build;
-using UnityEditor.AddressableAssets.Settings;
 using UnityEngine;
-using UnityEngine.AddressableAssets;
 
 namespace DivineDragon
 {
@@ -35,24 +29,14 @@ namespace DivineDragon
 
             if (!Initialized)
             {
-                // Ensure the project has been built at least once
-                if (!File.Exists(Addressables.BuildPath))
+                if (!CBT.LoadCatalogContent("Assets/Share/AddressableAssetsData/TempCatalogFolder/catalog.json"))
                 {
-                    AddressableAssetSettings.BuildPlayerContent(out AddressablesPlayerBuildResult result);
-                    bool success = string.IsNullOrEmpty(result.Error);
+                    return false;
+                }
 
-                    if (!success)
-                    {
-                        Debug.LogError("Addressables build error encountered: " + result.Error);
-                        return false;
-                    }
-                }
-                
-                if (CBT.LoadCatalogContent("Assets/Share/AddressableAssetsData/TempCatalogFolder/catalog.json")) {
-                    Initialized = true;
-                }
+                Initialized = true;
             }
-            
+
             return true;
         }
 
@@ -71,23 +55,28 @@ namespace DivineDragon
                 Debug.LogWarning("ExtractAsset: key is null or empty");
                 return false;
             }
-            
-            Initialize();
+
+            if (!Initialize())
+            {
+                Debug.LogError("ExtractAsset: Dumper failed to initialize. See earlier errors.");
+                return false;
+            }
 
             // TODO: Gather dependencies for the key for queueing them in the extraction
             var dependencies = CBT.GetDependenciesForAsset(key);
-            
+
             AssetRipperRequestBuilder builder = new AssetRipperRequestBuilder();
-            
+
             foreach (string dependency in dependencies)
             {
                 builder.AddFile(dependency);
             }
 
-            if (!builder.Export("dumper"))
-                Debug.LogError($"Export was unsuccessful");
-            
-            return true;
+            bool success = builder.Export("dumper");
+            if (!success)
+                Debug.LogError("Export was unsuccessful");
+
+            return success;
         }
         
         /// <summary>
@@ -102,27 +91,32 @@ namespace DivineDragon
                 Debug.LogWarning("ExtractAssets: no bundle found in directory and subdirectories");
                 return false;
             }
-            
-            Initialize();
+
+            if (!Initialize())
+            {
+                Debug.LogError("ExtractAssets: Dumper failed to initialize. See earlier errors.");
+                return false;
+            }
 
             IEnumerable<string> dependencies = new List<string>();
-            
+
             foreach (string bundle in paths)
             {
                 dependencies = dependencies.Concat(CBT.GetDependenciesForAsset(CBT.PathToInternalId(bundle.Replace("\\", "/"))));
             }
-            
+
             AssetRipperRequestBuilder builder = new AssetRipperRequestBuilder();
-            
+
             foreach (string dependency in dependencies.Distinct())
             {
                 builder.AddFile(dependency);
             }
 
-            if (!builder.Export("dumper"))
-                Debug.LogError($"Export was unsuccessful");
-            
-            return true;
+            bool success = builder.Export("dumper");
+            if (!success)
+                Debug.LogError("Export was unsuccessful");
+
+            return success;
         }
 
         /// <summary>

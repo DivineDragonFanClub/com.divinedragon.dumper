@@ -33,9 +33,16 @@ namespace DivineDragon
             try
             {
                 // TODO: This shouldn't be needed. The problem is initializing the Catalog cache, not the responsibility of the Dumper package.
-                Dumper.Initialize();
+                if (!Dumper.Initialize())
+                {
+                    EditorUtility.DisplayDialog("Error",
+                        "Dumper failed to initialize. Check the console for details.",
+                        "OK");
+                    return;
+                }
+
                 bool success = Dumper.ExtractAsset(CBT.PathToInternalId(path));
-                
+
                 if (success)
                 {
                     EditorUtility.DisplayDialog("Success",
@@ -51,7 +58,7 @@ namespace DivineDragon
             }
             catch (Exception ex)
             {
-                Debug.LogError($"Error running AssetRipper: {ex.Message}");
+                Debug.LogError($"Error running AssetRipper: {ex}");
 
                 EditorUtility.DisplayDialog("Error",
                     $"Error running AssetRipper:\n{ex.Message}",
@@ -62,7 +69,7 @@ namespace DivineDragon
                 EditorUtility.ClearProgressBar();
             }
         }
-        
+
         // Commented out because if things work as they should, you wouldn't need to gather and load a folder to begin with.
         // Worth re-enabling if maps prove to be too complex to support for now.
         #region Extract a folder
@@ -96,9 +103,16 @@ namespace DivineDragon
             try
             {
                 // TODO: This shouldn't be needed. The problem is initializing the Catalog cache, not the responsibility of the Dumper package.
-                Dumper.Initialize();
+                if (!Dumper.Initialize())
+                {
+                    EditorUtility.DisplayDialog("Error",
+                        "Dumper failed to initialize. Check the console for details.",
+                        "OK");
+                    return;
+                }
+
                 bool success = Dumper.ExtractAssets(bundles);
-                
+
                 if (success)
                 {
                     EditorUtility.DisplayDialog("Success",
@@ -114,7 +128,7 @@ namespace DivineDragon
             }
             catch (Exception ex)
             {
-                Debug.LogError($"Error running AssetRipper: {ex.Message}");
+                Debug.LogError($"Error running AssetRipper: {ex}");
 
                 EditorUtility.DisplayDialog("Error",
                     $"Error running AssetRipper:\n{ex.Message}",
