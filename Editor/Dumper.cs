@@ -145,5 +145,71 @@ namespace DivineDragon
             Debug.LogError($"Asset path does not exist or has invalid extension: {path}");
             return false;
         }
+
+        /// <summary>
+        /// Calls on DivineRipper to extract multiple arbitrary bundle files, gathering catalog dependencies for any paths that resolve to a known internal id.
+        /// </summary>
+        /// <param name="paths">Collection of absolute bundle paths to extract</param>
+        /// <returns>Returns true if the export succeeded</returns>
+        public static bool ExtractMultipleAssets(IEnumerable<string> paths)
+        {
+            if (paths == null)
+            {
+                return false;
+            }
+
+            if (!Initialize())
+            {
+                Debug.LogError("ExtractMultipleAssets: Dumper failed to initialize. See earlier errors.");
+                return false;
+            }
+
+            var builder = new AssetRipperRequestBuilder();
+            var filesToExtract = new HashSet<string>(System.StringComparer.OrdinalIgnoreCase);
+
+            foreach (string path in paths)
+            {
+                if (string.IsNullOrEmpty(path))
+                {
+                    continue;
+                }
+
+                string internalId = CBT.PathToInternalId(path);
+
+                if (!string.IsNullOrEmpty(internalId))
+                {
+                    var dependencies = CBT.GetDependenciesForAsset(internalId)?.ToList();
+
+                    if (dependencies != null && dependencies.Count > 0)
+                    {
+                        foreach (string dependency in dependencies)
+                        {
+                            if (filesToExtract.Add(dependency))
+                            {
+                                builder.AddFile(dependency);
+                            }
+                        }
+                    }
+                }
+
+                if (filesToExtract.Add(path))
+                {
+                    builder.AddFile(path);
+                }
+            }
+
+            if (filesToExtract.Count == 0)
+            {
+                return false;
+            }
+
+            if (!builder.Export("dumper"))
+            {
+                Debug.LogError("ExtractMultipleAssets: export failed");
+                return false;
+            }
+
+            return true;
+        }
     }
 }
