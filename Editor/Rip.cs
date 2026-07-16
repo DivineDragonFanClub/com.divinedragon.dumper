@@ -152,7 +152,6 @@ namespace DivineDragon
                 timing.TotalMs = totalStopwatch.ElapsedMilliseconds;
                 string orphanSuffix = orphanCount > 0 ? $", {orphanCount} orphan reference(s) detected — open the sync report" : string.Empty;
                 Debug.Log($"Assets merged into project: {newFileCount} new files imported, {skippedCount} existing files skipped{orphanSuffix}");
-                AssetDatabase.Refresh();
                 return true;
             }
             catch (System.Exception ex)
@@ -166,6 +165,7 @@ namespace DivineDragon
             {
                 // Pair with StartAssetEditing above; triggers the queued imports.
                 AssetDatabase.StopAssetEditing();
+                AssetDatabase.Refresh();
             }
         }
 
